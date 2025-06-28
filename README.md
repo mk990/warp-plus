@@ -7,6 +7,7 @@ Warp-Plus is an open-source implementation of Cloudflare's Warp, enhanced with P
 - **Warp Integration**: Leverages Cloudflare's Warp to provide a fast and secure VPN service.
 - **Psiphon Chaining**: Integrates with Psiphon for censorship circumvention, allowing seamless access to the internet in restrictive environments.
 - **Warp in Warp Chaining**: Chaning two instances of warp together to bypass location restrictions.
+- **AmneziaWG Mode (Experimental)**: Provides an option to connect using AmneziaWG protocols for enhanced censorship resistance. (Note: Currently, the connection logic for AmneziaWG is a placeholder and not functional).
 - **SOCKS5 Proxy Support**: Includes a SOCKS5 proxy for secure and private browsing.
 
 ## Getting Started
@@ -43,6 +44,19 @@ FLAGS
   -c, --config STRING      path to config file
       --version            displays version number
 ```
+
+### AmneziaWG Mode (Experimental)
+
+The AmneziaWG mode allows `warp-plus` to attempt connections using AmneziaWG protocols. This mode is intended for situations requiring advanced censorship circumvention.
+
+- **Enable AmneziaWG mode**: Use the `-a` or `--amnezia` flag.
+  ```bash
+  warp-plus -a --endpoint <amneziawg_server_address:port>
+  ```
+- **Endpoint**: When using AmneziaWG mode, the `--endpoint` flag **must** be used to specify the address and port of your AmneziaWG server.
+- **Keys**: This mode utilizes the WireGuard cryptographic keys derived from your Warp identity (specified via `--key` or loaded from cache).
+- **Mutual Exclusivity**: AmneziaWG mode cannot be used simultaneously with Psiphon mode (`--cfon`), Gool mode (`--gool`), or when specifying a direct WireGuard configuration file (`--wgconf`). It is also not compatible with scan mode (`--scan`).
+- **Current Status**: Please note that while the flags and basic CLI logic for AmneziaWG mode are in place, the actual AmneziaWG connection functionality is **currently a placeholder and not yet implemented.** Attempting to use this mode will result in an error indicating that the logic is not implemented.
 
 ### Country Codes for Psiphon
 

@@ -41,6 +41,7 @@ type rootConfig struct {
 	wgConf   string
 	testUrl  string
 	config   string
+	amnezia  bool
 }
 
 func newRootCmd() *rootConfig {
@@ -135,6 +136,13 @@ func newRootCmd() *rootConfig {
 		LongName:  "config",
 		Value:     ffval.NewValueDefault(&cfg.config, ""),
 	})
+	cfg.flags.AddFlag(ff.FlagConfig{
+		ShortName: 'a',
+		LongName:  "amnezia",
+		Value:     ffval.NewValueDefault(&cfg.amnezia, false),
+		Usage:     "enable AmneziaWG mode (experimental, uses --endpoint for Amnezia server)",
+		NoDefault: true,
+	})
 	cfg.command = &ff.Command{
 		Name:  appName,
 		Flags: cfg.flags,
@@ -152,6 +160,24 @@ func (c *rootConfig) exec(ctx context.Context, args []string) error {
 
 	if c.psiphon && c.gool {
 		fatal(l, errors.New("can't use cfon and gool at the same time"))
+	}
+
+	if c.amnezia {
+		if c.psiphon {
+			fatal(l, errors.New("can't use amnezia and cfon (psiphon) at the same time"))
+		}
+		if c.gool {
+			fatal(l, errors.New("can't use amnezia and gool (warp-in-warp) at the same time"))
+		}
+		if c.wgConf != "" {
+			fatal(l, errors.New("can't use amnezia and wgconf (direct wireguard config) at the same time"))
+		}
+		if c.scan {
+			fatal(l, errors.New("can't use amnezia and scan mode at the same time"))
+		}
+		if c.endpoint == "" {
+			fatal(l, errors.New("must provide --endpoint for AmneziaWG server when using --amnezia"))
+		}
 	}
 
 	if c.v4 && c.v6 {
@@ -182,6 +208,7 @@ func (c *rootConfig) exec(ctx context.Context, args []string) error {
 		WireguardConfig: c.wgConf,
 		Reserved:        c.reserved,
 		TestURL:         c.testUrl,
+		EnableAmnezia:   c.amnezia,
 	}
 
 	switch {

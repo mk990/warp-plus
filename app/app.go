@@ -33,6 +33,7 @@ type WarpOptions struct {
 	WireguardConfig string
 	Reserved        string
 	TestURL         string
+	EnableAmnezia   bool
 }
 
 type PsiphonOptions struct {
@@ -103,7 +104,101 @@ func RunWarp(ctx context.Context, l *slog.Logger, opts WarpOptions) error {
 		warpErr = runWarp(ctx, l, opts, endpoints[0])
 	}
 
+	// Handle AmneziaWG mode
+	if opts.EnableAmnezia {
+		l.Info("running in AmneziaWG mode")
+		warpErr = runWarpWithAmnezia(ctx, l, opts, opts.Endpoint)
+	}
+
 	return warpErr
+}
+
+func runWarpWithAmnezia(ctx context.Context, l *slog.Logger, opts WarpOptions, endpoint string) error {
+	l.Info("AmneziaWG mode selected")
+
+	// 1. Load or create Warp identity (to get WireGuard keys)
+	ident, err := warp.LoadOrCreateIdentity(l, path.Join(opts.CacheDir, "primary"), opts.License)
+	if err != nil {
+		l.Error("couldn't load primary warp identity for AmneziaWG")
+		return err
+	}
+	l.Debug("Warp identity loaded/created for AmneziaWG", "ID", ident.ID)
+
+	// 2. Generate a base WireGuard configuration from the identity
+	conf := generateWireguardConfig(ident)
+	conf.Interface.MTU = singleMTU // Or AmneziaWG specific MTU?
+	conf.Interface.DNS = []netip.Addr{opts.DnsAddr}
+
+	// The endpoint for the WireGuard peer config should be the AmneziaWG server
+	for i, peer := range conf.Peers {
+		peer.Endpoint = endpoint // This is opts.Endpoint, which is the AmneziaWG server
+		// Do we need Trick or KeepAlive for AmneziaWG's underlying WG connection?
+		// For now, let's assume AmneziaWG library handles keepalives if needed.
+		// peer.Trick = true
+		// peer.KeepAlive = 5
+
+		// Reserved bytes might not be applicable directly to AmneziaWG server itself.
+		// if opts.Reserved != "" {
+		// 	r, err := wiresocks.ParseReserved(opts.Reserved)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	peer.Reserved = r
+		// }
+		conf.Peers[i] = peer
+	}
+	l.Debug("WireGuard configuration generated for AmneziaWG", "config", conf)
+
+	// 3. Establish AmneziaWG connection using the WireGuard parameters
+	//    This is the core part that needs an AmneziaWG library/implementation.
+	//    This function would return a netstack.TUNEntry or similar,
+	//    or modify the way netstack.CreateNetTUN works with a custom AmneziaWG transport.
+	l.Info("Attempting to establish AmneziaWG connection (placeholder)...")
+	// =================== AMNEZIAWG CORE LOGIC START ===================
+	// Example: amneziaTunDevice, err := amneziaGoLib.Connect(ctx, conf, amneziaSpecificParams)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to connect with AmneziaWG: %w", err)
+	// }
+	// For now, we'll simulate a failure as we don't have the library.
+	// To make it proceed further for structural testing, one might temporarily
+	// call the normal establishWireguard, but that defeats the purpose of Amnezia.
+	// So, we'll return an error indicating it's not implemented.
+	return errors.New("AmneziaWG connection logic not implemented yet")
+	// =================== AMNEZIAWG CORE LOGIC END =====================
+
+	// 4. Create userspace TUN network stack using the AmneziaWG tunnel
+	//    This might need adjustment based on how the AmneziaWG library provides the tunnel.
+	//    It might provide a tun.Device directly, or integrate at a lower level.
+	var tnet *netstack.Net
+	var tunDev tun.Device // This would be the device from AmneziaWG
+
+	// Assuming amneziaTunDevice is available and is a tun.Device:
+	// tunDev = amneziaTunDevice
+
+	// Or, if AmneziaWG integrates into netstack.CreateNetTUN:
+	// tunDev, tnet, err = netstack.CreateNetTUNForAmnezia(conf.Interface.Addresses, conf.Interface.DNS, conf.Interface.MTU, amneziaSpecificParams)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create netstack TUN for AmneziaWG: %w", err)
+	// }
+
+	// For now, this part is unreachable due to the error above.
+	// If it were reachable:
+	// l.Debug("Netstack TUN created for AmneziaWG")
+
+	// 5. Test connectivity (optional, but good practice)
+	// if err := usermodeTunTest(ctx, l, tnet, opts.TestURL); err != nil {
+	// 	return fmt.Errorf("AmneziaWG connectivity test failed: %w", err)
+	// }
+	// l.Info("AmneziaWG connectivity test passed")
+
+	// 6. Run a proxy on the userspace stack
+	// _, err = wiresocks.StartProxy(ctx, l, tnet, opts.Bind)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to start SOCKS proxy over AmneziaWG: %w", err)
+	// }
+
+	l.Info("SOCKS proxy (would be) serving over AmneziaWG", "address", opts.Bind)
+	return nil
 }
 
 func runWireguard(ctx context.Context, l *slog.Logger, opts WarpOptions) error {
