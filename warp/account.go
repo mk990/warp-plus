@@ -59,6 +59,12 @@ func LoadOrCreateIdentity(l *slog.Logger, path, license string) (*Identity, erro
 			return nil, err
 		}
 
+		l.Info("setting device active")
+		_, err = warpAPI.UpdateBoundDevice(i.Token, i.ID, i.ID, i.Name, true)
+		if err != nil && !IsHTTPClientError(err) {
+			l.Warn("failed to update bound device, ignoring", "error", err)
+		}
+
 		iAcc, err := warpAPI.GetAccount(i.Token, i.ID)
 		if err != nil {
 			return nil, err
@@ -113,19 +119,25 @@ func CreateIdentity(l *slog.Logger, warpAPI *WarpAPI, license string) (Identity,
 		return Identity{}, err
 	}
 
+	l.Info("setting device name")
+	_, err = warpAPI.UpdateBoundDevice(i.Token, i.ID, i.ID, i.Name, true)
+	if err != nil && !IsHTTPClientError(err) {
+		l.Warn("failed to update bound device, ignoring", "error", err)
+	}
+
 	if license != "" {
 		l.Info("updating account license key")
 		_, err := warpAPI.UpdateAccount(i.Token, i.ID, license)
 		if err != nil {
 			return Identity{}, err
 		}
-
-		ac, err := warpAPI.GetAccount(i.Token, i.ID)
-		if err != nil {
-			return Identity{}, err
-		}
-		i.Account = ac
 	}
+
+	ac, err := warpAPI.GetAccount(i.Token, i.ID)
+	if err != nil {
+		return Identity{}, err
+	}
+	i.Account = ac
 
 	i.PrivateKey = privateKey
 
